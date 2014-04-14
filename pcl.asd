@@ -6,6 +6,6 @@
   :author "wenpin cui <wenpincui224@gmail.com>"
   :license "GPLv2"
   :depends-on (:cl-ppcre)
-  :components ((:file "package")
-               (:file "pcl")))
+  :components ((:file "ch23/package")
+               (:file "ch23/spam" :depends-on ("ch23/package"))))
 
