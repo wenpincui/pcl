@@ -1,11 +1,16 @@
 ;;;; pcl.asd
 
-(asdf:defsystem #:pcl
+(defpackage #:org.wenpin.pcl
+  (:use #:cl :asdf))
+(in-package :org.wenpin.pcl)
+
+(defsystem #:pcl
   :serial t
   :description "pcl's examples"
   :author "wenpin cui <wenpincui224@gmail.com>"
   :license "GPLv2"
   :depends-on (:cl-ppcre)
-  :components ((:file "ch23/package")
-               (:file "ch23/spam" :depends-on ("ch23/package"))))
+  :components ((:file "condition/cond-restart")
+               (:file "spam/package")
+               (:file "spam/spam" :depends-on ("spam/package"))))
 
