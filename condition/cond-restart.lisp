@@ -1,3 +1,5 @@
+(in-package :org.wenpin.pcl.cond-restart)
+
 (define-condition malformed-log-entry-error (error)
   ((test :initarg :text :reader text)))
 

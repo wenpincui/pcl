@@ -10,7 +10,8 @@
   :author "wenpin cui <wenpincui224@gmail.com>"
   :license "GPLv2"
   :depends-on (:cl-ppcre)
-  :components ((:file "condition/cond-restart")
+  :components ((:file "condition/package")
+               (:file "condition/cond-restart" :depends-on ("condition/package"))
                (:file "spam/package")
                (:file "spam/spam" :depends-on ("spam/package"))))
 
