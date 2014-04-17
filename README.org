@@ -1,3 +1,0 @@
-* pcl
-
-examples from <Practical Common Lisp>
