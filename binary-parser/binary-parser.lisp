@@ -12,6 +12,10 @@
 ;;   (minor-version :initarg :minor-version :accessor minor-version)
 ;;   (name :initarg :name :accessor name)))
 
+(defmacro with-gensyms ((&rest names) &body body)
+  `(let ,(loop for n in names collect `(,n (make-symbol ,(string n))))
+     ,@body))
+
 (defun to-keyword (sym)
   (intern (string sym) :keyword))
 
@@ -56,7 +60,6 @@
      (defmethod write-value ((type (eql ',name)) stream value &key)
        (progn ,@(mapcar #'slot->write-value slot)))))
 
-
 ;;; below are stub method for debug.
 (defmethod read-value ((type (eql 'u2)) stream &key)
   (format t "u2 read value ~%"))
@@ -69,3 +72,18 @@
 
 (defmethod write-value ((type (eql 'ascii)) value stream &key length)
   (format t "ascii write value ~a~%" length))
+
+;; binary class accessor
+;;(define-binary-accessor ascii (:key length)
+;;  (:reader (logic...))
+;;  (:writer (logic...)))
+;; what we want expand to
+;;(defmethod read-value ((type (eql 'ascii)) stream &key length)
+;;  (logic...))
+
+(defmacro define-binary-accessor (type args &body body)
+  `(progn
+     (defmethod read-value ((type (eql ',type)) stream &key ,@args)
+       ,(car (rest (assoc :reader body))))
+     (defmethod write-value ((type (eql ',type)) value stream &key ,@args)
+       ,(car (rest (assoc :writer body))))))
