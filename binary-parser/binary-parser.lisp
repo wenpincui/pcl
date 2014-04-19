@@ -48,18 +48,31 @@
 (defgeneric write-value (type value stream &key)
   (:documentation "write value to stream for type object"))
 
+(defun has-parent-p (list)
+  (if (null list)
+      nil
+      t))
+
 (defmacro define-binary-class (name (&rest super-class) slot)
-  `(progn
-     (defclass ,name ,super-class
-       ,(mapcar #'slot->class-slot slot))
+  (with-gensyms (all-slot)
+    (setf all-slot (append (and super-class (get (car super-class) :slots)) slot))
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (get ',name :slots) ',slot)
+         (when ',super-class
+           (setf (get ',name :parent) ',super-class)))
 
-     (defmethod read-value ((type (eql ',name)) stream &key)
-       (let ((object (make-instance ',name)))
-         (progn ,@(mapcar #'(lambda (x) (slot->read-value x 'object)) slot)
-                object)))
+       (defclass ,name ,super-class
+         ,(mapcar #'slot->class-slot slot))
 
-     (defmethod write-value ((type (eql ',name)) stream value &key)
-       (progn ,@(mapcar #'(lambda (x) (slot->write-value x 'value)) slot)))))
+       (defmethod read-value ((type (eql ',name)) stream &key)
+         (let ((object (make-instance ',name)))
+           (progn
+             ,@(mapcar #'(lambda (x) (slot->read-value x 'object)) all-slot)
+             object)))
+
+       (defmethod write-value ((type (eql ',name)) stream value &key)
+         (progn ,@(mapcar #'(lambda (x) (slot->write-value x 'value)) slot))))))
 
 ;; binary class accessor
 ;;(define-binary-accessor ascii (length)

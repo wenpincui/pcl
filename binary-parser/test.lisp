@@ -1,10 +1,5 @@
 ;;;; this file contains form for testing binary parser.
 
-(define-binary-class jpeg-header ()
-  ((major-version u2)
-   (minor-version u2)
-   (name (ascii :length 4))))
-
 (define-binary-accessor generic-byte (length)
   (:reader
    (loop with value = 0
@@ -28,3 +23,14 @@
    (with-input-from-string (str value)
      (loop repeat length
         do (write-byte (char-code (read-char str)) stream)))))
+
+(define-binary-class header ()
+  ((header-name (ascii :length 8))))
+
+(define-binary-class jpeg-header ()
+  ((major-version u2)
+   (minor-version u2)
+   (name (ascii :length 4))))
+
+(define-binary-class jpeg-header-son (jpeg-header)
+  ((son-name (ascii :length 12))))
