@@ -25,9 +25,9 @@
         do (write-byte (char-code (read-char str)) stream)))))
 
 (define-binary-class header ()
-  ((header-name (ascii :length 8))))
+  ((header-name (ascii :length 7))))
 
-(define-binary-class jpeg-header ()
+(define-binary-class jpeg-header (header)
   ((major-version u2)
    (minor-version u2)
    (name (ascii :length 4))))
