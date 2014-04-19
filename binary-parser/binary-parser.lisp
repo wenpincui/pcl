@@ -13,7 +13,7 @@
 ;;   (name :initarg :name :accessor name)))
 
 (defmacro with-gensyms ((&rest names) &body body)
-  `(let ,(loop for n in names collect `(,n (make-symbol ,(string n))))
+  `(let ,(loop for n in names collect `(,n (gensym)))
      ,@body))
 
 (defun to-keyword (sym)
@@ -28,19 +28,19 @@
       arg
       (list arg)))
 
-(defun slot->read-value (slot)
+(defun slot->read-value (slot object)
   (destructuring-bind (slot-name type-and-arg) slot
     (let* ((type-and-arg-list (mklist type-and-arg))
            (type (car type-and-arg-list))
            (args (cdr type-and-arg-list)))
-      `(setf (,slot-name object) (read-value ',type stream ,@args)))))
+      `(setf (,slot-name ,object) (read-value ',type stream ,@args)))))
 
-(defun slot->write-value (slot)
+(defun slot->write-value (slot object)
   (destructuring-bind (slot-name type-and-arg) slot
     (let* ((type-and-arg-list (mklist type-and-arg))
            (type (car type-and-arg-list))
            (args (cdr type-and-arg-list)))
-      `(write-value ',type (,slot-name object) stream ,@args))))
+      `(write-value ',type (,slot-name ,object) stream ,@args))))
 
 (defgeneric read-value (type stream &key)
   (:documentation "read value for type object from stream"))
@@ -55,35 +55,43 @@
 
      (defmethod read-value ((type (eql ',name)) stream &key)
        (let ((object (make-instance ',name)))
-         (progn ,@(mapcar #'slot->read-value slot))))
+         (progn ,@(mapcar #'(lambda (x) (slot->read-value x 'object)) slot)
+                object)))
 
      (defmethod write-value ((type (eql ',name)) stream value &key)
-       (progn ,@(mapcar #'slot->write-value slot)))))
-
-;;; below are stub method for debug.
-(defmethod read-value ((type (eql 'u2)) stream &key)
-  (format t "u2 read value ~%"))
-
-(defmethod write-value ((type (eql 'u2)) value stream &key)
-  (format t "u2 write value ~%"))
-
-(defmethod read-value ((type (eql 'ascii)) stream &key length)
-  (format t "ascii read value ~a~%" length))
-
-(defmethod write-value ((type (eql 'ascii)) value stream &key length)
-  (format t "ascii write value ~a~%" length))
+       (progn ,@(mapcar #'(lambda (x) (slot->write-value x 'value)) slot)))))
 
 ;; binary class accessor
-;;(define-binary-accessor ascii (:key length)
+;;(define-binary-accessor ascii (length)
 ;;  (:reader (logic...))
 ;;  (:writer (logic...)))
+;;
 ;; what we want expand to
 ;;(defmethod read-value ((type (eql 'ascii)) stream &key length)
 ;;  (logic...))
+;;
+;; another form we allowed
+;; (define-binary-accessor type2 (length)
+;;   (ascii length)))
+;;
+;; which expands to
+;; (progn
+;; (defmethod read-value ((type (eql 'type2)) stream &key length)
+;;   (read-value 'ascii &key length))
+;; (defmethod write-value ((type (eql 'type2)) value stream &key length)
+;;   (write-value 'ascii &key length)))
+;;
+;; but ... how to expand the symbol doesn't exist in macro form??
 
 (defmacro define-binary-accessor (type args &body body)
-  `(progn
-     (defmethod read-value ((type (eql ',type)) stream &key ,@args)
-       ,(car (rest (assoc :reader body))))
-     (defmethod write-value ((type (eql ',type)) value stream &key ,@args)
-       ,(car (rest (assoc :writer body))))))
+  (ecase (length body)
+    (1 `(progn (defmethod read-value ((type (eql ',type)) stream &key ,@args)
+                 (read-value ',(caar body) stream ,@(rest (car body))))
+               (defmethod write-value ((type (eql ',type)) value stream &key ,@args)
+                 (write-value ',(caar body) value stream ,@(rest (car body))))))
+    (2 `(progn (defmethod read-value ((type (eql ',type)) stream &key ,@args)
+                 ,@(rest (assoc :reader body)))
+               (defmethod write-value ((type (eql ',type)) value stream &key ,@args)
+                 ,@(rest (assoc :writer body)))))))
+
+;; TODO: add inherition support.
