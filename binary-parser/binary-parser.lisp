@@ -33,14 +33,14 @@
     (let* ((type-and-arg-list (mklist type-and-arg))
            (type (car type-and-arg-list))
            (args (cdr type-and-arg-list)))
-      `(setf (,slot-name object) (read-value ',type stream ,@args)))))
+      `(setf (,slot-name ,object) (read-value ',type ,object ,@args)))))
 
-(defun slot->write-value (slot object)
+(defun slot->write-value (slot object stream)
   (destructuring-bind (slot-name type-and-arg) slot
     (let* ((type-and-arg-list (mklist type-and-arg))
            (type (car type-and-arg-list))
            (args (cdr type-and-arg-list)))
-      `(write-value ',type (,slot-name object) stream ,@args))))
+      `(write-value ',type (,slot-name ,object) ,stream ,@args))))
 
 (defgeneric read-value (type stream &key)
   (:documentation "read value for type object from stream"))
@@ -75,23 +75,24 @@
               (find-all-slots (car (get parent :parent))))))
 
 (defmacro define-binary-class (name (&rest super-class) slot)
-  `(progn
-     (eval-when (:compile-toplevel :load-toplevel :execute)
-       (setf (get ',name :slots) ',(mapcar #'car slot))
-       (setf (get ',name :parent) ',super-class))
+  (with-gensyms (objectvar streamvar)
+    `(progn
+       (eval-when (:compile-toplevel :load-toplevel :execute)
+         (setf (get ',name :slots) ',(mapcar #'car slot))
+         (setf (get ',name :parent) ',super-class))
 
-     (defclass ,name ,super-class
-       ,(mapcar #'slot->class-slot slot))
+       (defclass ,name ,super-class
+         ,(mapcar #'slot->class-slot slot))
 
-     (defmethod read-object progn ((object ,name) stream)
-                (with-slots ,(mapcar #'first slot) object
-                  (progn
-                    ,@(mapcar #'(lambda (x) (slot->read-value x 'stream)) slot))))
+       (defmethod read-object progn ((,objectvar ,name) ,streamvar)
+                  (with-slots ,(mapcar #'first slot) ,objectvar
+                    (progn
+                      ,@(mapcar #'(lambda (x) (slot->read-value x streamvar)) slot))))
 
-     (defmethod write-object progn ((object ,name) stream)
-                (with-slots ,(mapcar #'first slot) object
-                  (progn
-                    ,@(mapcar #'(lambda (x) (slot->write-value x 'stream)) slot))))))
+       (defmethod write-object progn ((,objectvar ,name) ,streamvar)
+                  (with-slots ,(mapcar #'first slot) ,objectvar
+                    (progn
+                      ,@(mapcar #'(lambda (x) (slot->write-value x objectvar streamvar)) slot)))))))
 
 ;; binary class accessor
 ;;(define-binary-accessor ascii (length)
@@ -114,6 +115,7 @@
 ;;   (write-value 'ascii &key length)))
 ;;
 
+;;; TODO: gensym, and lexcical binding for user defined body.
 (defmacro define-binary-accessor (type args &body body)
   (ecase (length body)
     (1 `(progn (defmethod read-value ((type (eql ',type)) stream &key ,@args)
