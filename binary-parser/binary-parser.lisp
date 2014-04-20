@@ -28,19 +28,16 @@
       arg
       (list arg)))
 
-(defun slot->read-value (slot object)
-  (destructuring-bind (slot-name type-and-arg) slot
-    (let* ((type-and-arg-list (mklist type-and-arg))
-           (type (car type-and-arg-list))
-           (args (cdr type-and-arg-list)))
-      `(setf (,slot-name ,object) (read-value ',type ,object ,@args)))))
+(defun normalized-slot (slot)
+  (cons (car slot) (mklist (cadr slot))))
 
-(defun slot->write-value (slot object stream)
-  (destructuring-bind (slot-name type-and-arg) slot
-    (let* ((type-and-arg-list (mklist type-and-arg))
-           (type (car type-and-arg-list))
-           (args (cdr type-and-arg-list)))
-      `(write-value ',type (,slot-name ,object) ,stream ,@args))))
+(defun slot->read-object (slot object stream)
+  (destructuring-bind (slot-name type &rest args) (normalized-slot slot)
+    `(setf (,slot-name ,object) (read-value ',type ,stream ,@args))))
+
+(defun slot->write-object (slot object stream)
+  (destructuring-bind (slot-name type &rest args) (normalized-slot slot)
+    `(write-value ',type (,slot-name ,object) ,stream ,@args)))
 
 (defgeneric read-value (type stream &key)
   (:documentation "read value for type object from stream"))
@@ -87,12 +84,12 @@
        (defmethod read-object progn ((,objectvar ,name) ,streamvar)
                   (with-slots ,(mapcar #'first slot) ,objectvar
                     (progn
-                      ,@(mapcar #'(lambda (x) (slot->read-value x streamvar)) slot))))
+                      ,@(mapcar #'(lambda (x) (slot->read-object x objectvar streamvar)) slot))))
 
        (defmethod write-object progn ((,objectvar ,name) ,streamvar)
                   (with-slots ,(mapcar #'first slot) ,objectvar
                     (progn
-                      ,@(mapcar #'(lambda (x) (slot->write-value x objectvar streamvar)) slot)))))))
+                      ,@(mapcar #'(lambda (x) (slot->write-object x objectvar streamvar)) slot)))))))
 
 ;; binary class accessor
 ;;(define-binary-accessor ascii (length)
