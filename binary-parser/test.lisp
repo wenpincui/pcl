@@ -1,29 +1,28 @@
 ;;;; this file contains form for testing binary parser.
 
 (define-binary-accessor generic-byte (length)
-  (:reader
+  (:reader (in)
    (loop with value = 0
       for i from (* 8 (1- length)) downto 0 by 8
-      do (setf (ldb (byte 8 i) value) (read-byte stream))
+      do (setf (ldb (byte 8 i) value) (read-byte in))
       finally (return value)))
-  (:writer
+  (:writer (out value)
    (loop
       for i from (* 8 (1- length)) downto 0 by 8
-        do (write-byte (ldb (byte 8 i) value) stream))))
+        do (write-byte (ldb (byte 8 i) value) out))))
 
 (define-binary-accessor u2 ()
   (generic-byte :length 2))
 
 (define-binary-accessor ascii (length)
-  (:reader
+  (:reader (in)
    (with-output-to-string (out)
-     (format t "ascii reader ~a~%" length)
      (loop repeat length
-        do (write-char (code-char (read-byte stream)) out))))
-  (:writer
+        do (write-char (code-char (read-byte in)) out))))
+  (:writer (out value)
    (with-input-from-string (str value)
      (loop repeat length
-        do (write-byte (char-code (read-char str)) stream)))))
+        do (write-byte (char-code (read-char str)) out)))))
 
 (define-binary-class header ()
   ((header-name (ascii :length 7))))
