@@ -17,6 +17,7 @@
 (define-binary-accessor ascii (length)
   (:reader
    (with-output-to-string (out)
+     (format t "ascii reader ~a~%" length)
      (loop repeat length
         do (write-char (code-char (read-byte stream)) out))))
   (:writer
@@ -25,7 +26,7 @@
         do (write-byte (char-code (read-char str)) stream)))))
 
 (define-binary-class header ()
-  ((header-name (ascii :length 8))))
+  ((header-name (ascii :length 7))))
 
 (define-binary-class jpeg-header (header)
   ((major-version u2)

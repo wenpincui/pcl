@@ -28,19 +28,16 @@
       arg
       (list arg)))
 
-(defun slot->read-value (slot object)
-  (destructuring-bind (slot-name type-and-arg) slot
-    (let* ((type-and-arg-list (mklist type-and-arg))
-           (type (car type-and-arg-list))
-           (args (cdr type-and-arg-list)))
-      `(setf (,slot-name ,object) (read-value ',type stream ,@args)))))
+(defun normalized-slot (slot)
+  (cons (car slot) (mklist (cadr slot))))
 
-(defun slot->write-value (slot object)
-  (destructuring-bind (slot-name type-and-arg) slot
-    (let* ((type-and-arg-list (mklist type-and-arg))
-           (type (car type-and-arg-list))
-           (args (cdr type-and-arg-list)))
-      `(write-value ',type (,slot-name ,object) stream ,@args))))
+(defun slot->read-object (slot object stream)
+  (destructuring-bind (slot-name type &rest args) (normalized-slot slot)
+    `(setf (,slot-name ,object) (read-value ',type ,stream ,@args))))
+
+(defun slot->write-object (slot object stream)
+  (destructuring-bind (slot-name type &rest args) (normalized-slot slot)
+    `(write-value ',type (,slot-name ,object) ,stream ,@args)))
 
 (defgeneric read-value (type stream &key)
   (:documentation "read value for type object from stream"))
@@ -48,10 +45,31 @@
 (defgeneric write-value (type value stream &key)
   (:documentation "write value to stream for type object"))
 
-(defun has-parent-p (list)
-  (if (null list)
+(defgeneric read-object (object stream)
+  (:method-combination progn :most-specific-last)
+  (:documentation "fill the object from stream"))
+
+(defgeneric write-object (object stream)
+  (:method-combination progn :most-specific-last)
+  (:documentation "fill the stream with the slots of the object"))
+
+(defmethod read-value ((type symbol) stream &key)
+  (let ((object (make-instance type)))
+    (read-object object stream)
+    object))
+
+(defmethod write-value ((type symbol) value stream &key)
+  (assert (typep value type))
+  (write-object value stream))
+
+(defun current-slots (name)
+  (get name :slots))
+
+(defun find-all-slots (parent)
+  (if (null parent)
       nil
-      t))
+      (append (current-slots parent)
+              (find-all-slots (car (get parent :parent))))))
 
 (defun find-inherited-slot (super-class)
   (if super-class
@@ -60,25 +78,24 @@
       nil))
 
 (defmacro define-binary-class (name (&rest super-class) slot)
-  (with-gensyms (all-slot)
-    (setf all-slot (append (find-inherited-slot super-class) slot))
+  (with-gensyms (objectvar streamvar)
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
-         (setf (get ',name :slots) ',slot)
-         (when ',super-class
-           (setf (get ',name :parent) ',super-class)))
+         (setf (get ',name :slots) ',(mapcar #'car slot))
+         (setf (get ',name :parent) ',super-class))
 
        (defclass ,name ,super-class
          ,(mapcar #'slot->class-slot slot))
 
-       (defmethod read-value ((type (eql ',name)) stream &key)
-         (let ((object (make-instance ',name)))
-           (progn
-             ,@(mapcar #'(lambda (x) (slot->read-value x 'object)) all-slot)
-             object)))
+       (defmethod read-object progn ((,objectvar ,name) ,streamvar)
+                  (with-slots ,(mapcar #'first slot) ,objectvar
+                    (progn
+                      ,@(mapcar #'(lambda (x) (slot->read-object x objectvar streamvar)) slot))))
 
-       (defmethod write-value ((type (eql ',name)) stream value &key)
-         (progn ,@(mapcar #'(lambda (x) (slot->write-value x 'value)) slot))))))
+       (defmethod write-object progn ((,objectvar ,name) ,streamvar)
+                  (with-slots ,(mapcar #'first slot) ,objectvar
+                    (progn
+                      ,@(mapcar #'(lambda (x) (slot->write-object x objectvar streamvar)) slot)))))))
 
 ;; binary class accessor
 ;;(define-binary-accessor ascii (length)
@@ -100,8 +117,8 @@
 ;; (defmethod write-value ((type (eql 'type2)) value stream &key length)
 ;;   (write-value 'ascii &key length)))
 ;;
-;; but ... how to expand the symbol doesn't exist in macro form??
 
+;;; TODO: gensym, and lexcical binding for user defined body.
 (defmacro define-binary-accessor (type args &body body)
   (ecase (length body)
     (1 `(progn (defmethod read-value ((type (eql ',type)) stream &key ,@args)
@@ -112,5 +129,3 @@
                  ,@(rest (assoc :reader body)))
                (defmethod write-value ((type (eql ',type)) value stream &key ,@args)
                  ,@(rest (assoc :writer body)))))))
-
-;; TODO: add inherition support.
