@@ -53,9 +53,15 @@
       nil
       t))
 
+(defun find-inherited-slot (super-class)
+  (if super-class
+      (append (get (car super-class) :slots)
+              (find-inherited-slot (get (car super-class) :parent)))
+      nil))
+
 (defmacro define-binary-class (name (&rest super-class) slot)
   (with-gensyms (all-slot)
-    (setf all-slot (append (and super-class (get (car super-class) :slots)) slot))
+    (setf all-slot (append (find-inherited-slot super-class) slot))
     `(progn
        (eval-when (:compile-toplevel :load-toplevel :execute)
          (setf (get ',name :slots) ',slot)
