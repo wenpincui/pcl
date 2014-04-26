@@ -203,7 +203,7 @@
 (define-binary-class generic-frame-v2.2 (id3-v2.2-frame generic-frame) ())
 (define-binary-class generic-frame-v2.3 (id3-v2.3-frame generic-frame) ())
 
-(define-binary-class generic-frame (frame)
+(define-binary-class generic-frame ()
   ((data (raw-bytes :size (data-bytes (current-binary-object))))))
 
 (defgeneric data-bytes (frame))
